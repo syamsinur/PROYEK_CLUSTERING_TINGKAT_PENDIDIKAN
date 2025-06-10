@@ -8,4 +8,4 @@
 - pip install -U scikit-learn
 
 ## Run Streamlit
-- streamlit run app.py
+streamlit run app.py

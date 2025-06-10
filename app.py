@@ -120,12 +120,6 @@ if uploaded_file:
         ax.set_ylabel("Inertia")
         ax.set_title("Elbow Method")
 
-        elbow_point = 1
-        ax.plot(k_range[elbow_point], inertias[elbow_point], marker='x', color='red')
-
-        for i, value in enumerate(inertias):
-            ax.text(k_range[i], value + 0.5, f"{value:.2f}", ha='center')
-
         st.pyplot(fig)
         
         k = st.slider("Pilih jumlah cluster", 2, 10, 2)
@@ -295,6 +289,14 @@ if uploaded_file:
         st.dataframe(df, column_config={"_index": "Cluster"})
     else:
         st.badge(":orange-badge ⚠️ Cluster tidak ditemukan")
+
+    fig, ax = plt.subplots(figsize=(15, 7))
+    ax.bar(x=dfdesa['Cluster'].value_counts().index.astype(str), height=dfdesa['Cluster'].value_counts())
+    ax.set_title('Jumlah Cluster')
+    ax.set_xlabel('Cluster')
+    ax.set_ylabel('Jumlah')
+
+    st.pyplot(fig)
 
     # Download hasil
     csv = dfdesa.to_csv(index=False).encode('utf-8')

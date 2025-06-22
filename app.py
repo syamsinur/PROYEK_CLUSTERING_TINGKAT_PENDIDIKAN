@@ -1,11 +1,16 @@
 import streamlit as st
+import geopandas as gpd # type: ignore
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 import scipy.cluster.hierarchy as sch
+import folium # type: ignore
+from folium import Tooltip # type: ignore
+from streamlit_folium import st_folium # type: ignore
 
 st.set_page_config(page_title="Clustering App", layout="wide", page_icon="🏫")
 
@@ -19,7 +24,7 @@ if uploaded_file:
     st.dataframe(dfdesa.head(), hide_index=True)
 
     # Hapus kolom
-    kolom_dihapus = ['No.', 'JML Penduduk', 'JML Penduduk Belum/Tidak Bekerja', 'Kab/Kota', 'Kecamatan']
+    kolom_dihapus = ["No.", "JML Penduduk", "JML Penduduk Belum/Tidak Bekerja", "Kab/Kota", "Kecamatan"]
     df_cleaned = dfdesa.drop(columns=kolom_dihapus, errors='ignore')
 
     st.header("📋 Data Fitur yang Digunakan")
@@ -47,9 +52,9 @@ if uploaded_file:
     st.header("🔍 Pengecekan Outliers")
     fig, ax = plt.subplots(figsize=(25, 10))
 
-    dfdesa.boxplot(column=['TIDAK SEKOLAH', 'BELUM TAMAT SD', 'SD', 'SLTP', 'SLTA',
-       'DI/DII', 'DIII', 'DIV/S1', 'S2', 'S3', 'SD/SEDERAJAT', 'SMP/SEDERAJAT',
-       'SMA/SEDERAJAT', 'SMK/SEDERAJAT', 'PERGURUAN TINGGI'])
+    dfdesa.boxplot(column=["TIDAK SEKOLAH", "BELUM TAMAT SD", "SD", "SLTP", "SLTA",
+       "DI/DII", "DIII", "DIV/S1", "S2", "S3", "SD/SEDERAJAT", "SMP/SEDERAJAT",
+       "SMA/SEDERAJAT", "SMK/SEDERAJAT", "PERGURUAN TINGGI"])
     st.pyplot(fig)
 
     # Capping outliers
@@ -69,16 +74,16 @@ if uploaded_file:
     st.header("📋 Data Setelah Data yang Outlier Ditangani")
     fig, ax = plt.subplots(figsize=(25, 10))
 
-    dfdesacleaned.boxplot(column=['TIDAK SEKOLAH', 'BELUM TAMAT SD', 'SD', 'SLTP', 'SLTA',
-       'DI/DII', 'DIII', 'DIV/S1', 'S2', 'S3', 'SD/SEDERAJAT', 'SMP/SEDERAJAT',
-       'SMA/SEDERAJAT', 'SMK/SEDERAJAT', 'PERGURUAN TINGGI'])
+    dfdesacleaned.boxplot(column=["TIDAK SEKOLAH", "BELUM TAMAT SD", "SD", "SLTP", "SLTA",
+       "DI/DII", "DIII", "DIV/S1", "S2", "S3", "SD/SEDERAJAT", "SMP/SEDERAJAT",
+       "SMA/SEDERAJAT", "SMK/SEDERAJAT", "PERGURUAN TINGGI"])
     st.pyplot(fig)
 
     st.header("📋 Data Setelah Dinormalisasi")
     # Normalisasi
-    fitur = ['TIDAK SEKOLAH', 'BELUM TAMAT SD', 'SD', 'SLTP', 'SLTA',
-             'DI/DII', 'DIII', 'DIV/S1', 'S2', 'S3', 'SD/SEDERAJAT',
-             'SMP/SEDERAJAT', 'SMA/SEDERAJAT', 'SMK/SEDERAJAT', 'PERGURUAN TINGGI']
+    fitur = ["TIDAK SEKOLAH", "BELUM TAMAT SD", "SD", "SLTP", "SLTA",
+       "DI/DII", "DIII", "DIV/S1", "S2", "S3", "SD/SEDERAJAT", "SMP/SEDERAJAT",
+       "SMA/SEDERAJAT", "SMK/SEDERAJAT", "PERGURUAN TINGGI"]
     x_train = dfdesacleaned[fitur].values
     scaler = MinMaxScaler()
     x_train_scaled = scaler.fit_transform(x_train)
@@ -125,14 +130,14 @@ if uploaded_file:
         k = st.slider("Pilih jumlah cluster", 2, 10, 2)
         model = KMeans(n_clusters=k, random_state=42)
         cluster = model.fit_predict(x_train_scaled)
-        dfdesa['Cluster'] = cluster
+        dfdesa["Cluster"] = cluster
 
     elif metode == "Hierarchical Ward":
         silhouette_scores = []
         dbi_scores = []
 
         for n_clusters in range(2, 11):
-            hie = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
+            hie = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
             clusters_hie = hie.fit_predict(x_train_scaled)
 
             # Menghitung Silhouette Score
@@ -146,13 +151,13 @@ if uploaded_file:
         # Dendrogram
         st.header("🧬 Dendrogram")
         fig, ax = plt.subplots(figsize=(10, 5))
-        dendro = sch.dendrogram(sch.linkage(x_train_scaled, method='ward'), ax=ax)
+        dendro = sch.dendrogram(sch.linkage(x_train_scaled, method="ward"), ax=ax)
         st.pyplot(fig)
 
         k = st.slider("Pilih jumlah cluster", 2, 10, 2)
-        model = AgglomerativeClustering(n_clusters=k, linkage='ward')
+        model = AgglomerativeClustering(n_clusters=k, linkage="ward")
         cluster = model.fit_predict(x_train_scaled)
-        dfdesa['Cluster'] = cluster
+        dfdesa["Cluster"] = cluster
 
     # Evaluasi
     st.header("📊 Evaluasi")
@@ -275,6 +280,11 @@ if uploaded_file:
 
     # Menampilkan hasil clustering
     st.header("📊 Hasil Clustering")
+
+    # Warna untuk cluster
+    colors = ['#66c2a5', '#ffd92f']
+    labels = ['0', '1']
+
     clust = st.number_input("Pilih Cluster", value=0)
 
     df = pd.DataFrame({
@@ -282,7 +292,6 @@ if uploaded_file:
         "Persentase (%)": (dfdesa['Cluster'].value_counts() / dfdesa['Cluster'].value_counts().sum() * 100).round(2).astype(str) + '%'
     })
     
-
     if clust == 0 or clust == 1:
         df_filtered = dfdesa[dfdesa['Cluster'] == clust]
         st.dataframe(df_filtered)
@@ -291,15 +300,109 @@ if uploaded_file:
         st.badge(":orange-badge ⚠️ Cluster tidak ditemukan")
 
     fig, ax = plt.subplots(figsize=(15, 7))
-    ax.bar(x=dfdesa['Cluster'].value_counts().index.astype(str), height=dfdesa['Cluster'].value_counts())
+    ax.bar(
+        x=dfdesa['Cluster'].value_counts().index.astype(str), 
+        height=dfdesa['Cluster'].value_counts(),
+        color=colors
+    )
     ax.set_title('Jumlah Cluster')
     ax.set_xlabel('Cluster')
     ax.set_ylabel('Jumlah')
 
     st.pyplot(fig)
 
+    # Menampilkan peta
+    st.header("🌏Peta Bangkalan")
+
+    # Baca shapefile
+    gdf_all = gpd.read_file("gadm36_IDN_4/gadm36_IDN_4.shp")
+
+    # Filter Bangkalan
+    gdf_bangkalan = gdf_all[gdf_all["NAME_2"] == "Bangkalan"]
+
+    # Uppercase nama kecamatan dan desa
+    dfdesa["Kecamatan"] = dfdesa["Kecamatan"].str.upper().str.strip()
+    dfdesa["Desa"] = dfdesa["Desa"].str.upper().str.strip()
+    gdf_bangkalan["NAME_3"] = gdf_bangkalan["NAME_3"].str.upper().str.strip()
+    gdf_bangkalan["NAME_4"] = gdf_bangkalan["NAME_4"].str.upper().str.strip()
+
+    # Merge shapefile dengan hasil clustering
+    gdf_joined = gdf_bangkalan.merge(
+        dfdesa,
+        left_on=["NAME_3", "NAME_4"],
+        right_on=["Kecamatan", "Desa"]
+    )
+
+    # Hasil merge
+    st.write("Jumlah Desa:", len(gdf_joined), "Desa")
+
+    # Validasi geometry
+    gdf_joined = gdf_joined[gdf_joined.geometry.notnull() & ~gdf_joined.geometry.is_empty]
+    gdf_joined = gdf_joined[gdf_joined.is_valid]
+
+    # Set CRS jika belum ada
+    if gdf_joined.crs is None:
+        gdf_joined.set_crs(epsg=4326, inplace=True)
+    else:
+        gdf_joined = gdf_joined.to_crs(epsg=4326)
+
+    # Ambil titik tengah peta
+    center = gdf_joined.geometry.centroid.unary_union.centroid
+    m = folium.Map(location=[center.y, center.x], zoom_start=10, tiles='cartodbpositron')
+
+    # Tambahkan layer per desa
+    for _, row in gdf_joined.iterrows():
+        geo_json = gpd.GeoSeries([row.geometry]).__geo_interface__
+
+        folium.GeoJson(
+            data=geo_json,
+            style_function=lambda feature, color=colors[row["Cluster"]]: {
+                'fillColor': color,
+                'color': 'black',
+                'weight': 0.5,
+                'fillOpacity': 0.7,
+            },
+            tooltip=Tooltip(f"Desa: {row['Desa'].title()}<br>Kecamatan: {row['Kecamatan'].title()}<br>Cluster: {row['Cluster']}")
+        ).add_to(m)
+
+    # Tambahkan legend
+    legend_html = """
+    <style>
+    .legend {
+        position: absolute;
+        bottom: 50px;
+        left: 10px;
+        z-index: 9999;
+        background-color: white;
+        border: 2px solid gray;
+        padding: 10px;
+        font-size: 14px;
+        box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+    }
+    .legend i {
+        width: 14px;
+        height: 14px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.7;
+    }
+    </style>
+
+    <div class='legend'>
+        <b>Legenda:</b><br>
+        <i style='background: #66c2a5'></i> Cluster 0<br>
+        <i style='background: #ffd92f'></i> Cluster 1<br>
+    </div>
+    """
+    
+    # Menampilkan peta
+    st_folium(m, width=1000, height=600)
+
+    # Menampilkan legend
+    st.markdown(legend_html, unsafe_allow_html=True)
+
     # Download hasil
-    csv = dfdesa.to_csv(index=False).encode('utf-8')
+    csv = dfdesa.to_csv(index=False).encode("utf-8")
     st.download_button("⬇️ Download Hasil CSV", csv, "hasil_clustering.csv", "text/csv")
 
 st.caption("by M. Nur Syamsi Maulidi")

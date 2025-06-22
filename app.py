@@ -14,7 +14,7 @@ from streamlit_folium import st_folium # type: ignore
 
 st.set_page_config(page_title="Clustering App", layout="wide", page_icon="🏫")
 
-st.title("Aplikasi Clustering Tingkat Pendidikan 📖")
+st.title("Aplikasi Clustering Tingkat Pendidikan Kabupaten Bangkalan 📖")
 
 uploaded_file = st.file_uploader("📂 Upload Dataset CSV", type="csv")
 

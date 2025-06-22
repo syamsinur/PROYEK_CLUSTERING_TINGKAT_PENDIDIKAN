@@ -1,4 +1,5 @@
 streamlit
+streamlit-folium
 scikit-learn
 pandas
 numpy

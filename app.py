@@ -314,92 +314,106 @@ if uploaded_file:
     # Menampilkan peta
     st.header("🌏Peta Bangkalan")
 
-    # Baca shapefile
-    gdf_all = gpd.read_file("gadm36_IDN_4/gadm36_IDN_4.shp")
+    if "show_map" not in st.session_state:
+        st.session_state.show_map = False
 
-    # Filter Bangkalan
-    gdf_bangkalan = gdf_all[gdf_all["NAME_2"] == "Bangkalan"]
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Tampilkan Peta"):
+            st.session_state.show_map = True
+    with col2:
+        if st.button("Sembunyikan Peta"):
+            st.session_state.show_map = False
 
-    # Uppercase nama kecamatan dan desa
-    dfdesa["Kecamatan"] = dfdesa["Kecamatan"].str.upper().str.strip()
-    dfdesa["Desa"] = dfdesa["Desa"].str.upper().str.strip()
-    gdf_bangkalan["NAME_3"] = gdf_bangkalan["NAME_3"].str.upper().str.strip()
-    gdf_bangkalan["NAME_4"] = gdf_bangkalan["NAME_4"].str.upper().str.strip()
+    if st.session_state.show_map:
+        # Baca shapefile
+        gdf_all = gpd.read_file("gadm36_IDN_4/gadm36_IDN_4.shp")
 
-    # Merge shapefile dengan hasil clustering
-    gdf_joined = gdf_bangkalan.merge(
-        dfdesa,
-        left_on=["NAME_3", "NAME_4"],
-        right_on=["Kecamatan", "Desa"]
-    )
+        # Filter Bangkalan
+        gdf_bangkalan = gdf_all[gdf_all["NAME_2"] == "Bangkalan"]
 
-    # Hasil merge
-    st.write("Jumlah Desa:", len(gdf_joined), "Desa")
+        # Uppercase nama kecamatan dan desa
+        dfdesa["Kecamatan"] = dfdesa["Kecamatan"].str.upper().str.strip()
+        dfdesa["Desa"] = dfdesa["Desa"].str.upper().str.strip()
+        gdf_bangkalan["NAME_3"] = gdf_bangkalan["NAME_3"].str.upper().str.strip()
+        gdf_bangkalan["NAME_4"] = gdf_bangkalan["NAME_4"].str.upper().str.strip()
 
-    # Validasi geometry
-    gdf_joined = gdf_joined[gdf_joined.geometry.notnull() & ~gdf_joined.geometry.is_empty]
-    gdf_joined = gdf_joined[gdf_joined.is_valid]
+        # Merge shapefile dengan hasil clustering
+        gdf_joined = gdf_bangkalan.merge(
+            dfdesa,
+            left_on=["NAME_3", "NAME_4"],
+            right_on=["Kecamatan", "Desa"]
+        )
 
-    # Set CRS jika belum ada
-    if gdf_joined.crs is None:
-        gdf_joined.set_crs(epsg=4326, inplace=True)
+        # Hasil merge
+        st.write("Jumlah Desa:", len(gdf_joined), "Desa")
+
+        # Validasi geometry
+        gdf_joined = gdf_joined[gdf_joined.geometry.notnull() & ~gdf_joined.geometry.is_empty]
+        gdf_joined = gdf_joined[gdf_joined.is_valid]
+
+        # Set CRS jika belum ada
+        if gdf_joined.crs is None:
+            gdf_joined.set_crs(epsg=4326, inplace=True)
+        else:
+            gdf_joined = gdf_joined.to_crs(epsg=4326)
+
+        # Ambil titik tengah peta
+        center = gdf_joined.geometry.centroid.unary_union.centroid
+        m = folium.Map(location=[center.y, center.x], zoom_start=10, tiles='cartodbpositron')
+
+        # Tambahkan layer per desa
+        for _, row in gdf_joined.iterrows():
+            geo_json = gpd.GeoSeries([row.geometry]).__geo_interface__
+
+            folium.GeoJson(
+                data=geo_json,
+                style_function=lambda feature, color=colors[row["Cluster"]]: {
+                    'fillColor': color,
+                    'color': 'black',
+                    'weight': 0.5,
+                    'fillOpacity': 0.7,
+                },
+                tooltip=Tooltip(f"Desa: {row['Desa'].title()}<br>Kecamatan: {row['Kecamatan'].title()}<br>Cluster: {row['Cluster']}")
+            ).add_to(m)
+
+        # Tambahkan legend
+        legend_html = """
+        <style>
+        .legend {
+            position: absolute;
+            bottom: 50px;
+            left: 10px;
+            z-index: 9999;
+            background-color: white;
+            border: 2px solid gray;
+            padding: 10px;
+            font-size: 14px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+        }
+        .legend i {
+            width: 14px;
+            height: 14px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+        </style>
+
+        <div class='legend'>
+            <b>Legend:</b><br>
+            <i style='background: #66c2a5'></i> Cluster 0<br>
+            <i style='background: #ffd92f'></i> Cluster 1<br>
+        </div>
+        """
+        
+        # Menampilkan peta
+        st_folium(m, width=1000, height=600)
+
+        # Menampilkan legend
+        st.markdown(legend_html, unsafe_allow_html=True)
     else:
-        gdf_joined = gdf_joined.to_crs(epsg=4326)
-
-    # Ambil titik tengah peta
-    center = gdf_joined.geometry.centroid.unary_union.centroid
-    m = folium.Map(location=[center.y, center.x], zoom_start=10, tiles='cartodbpositron')
-
-    # Tambahkan layer per desa
-    for _, row in gdf_joined.iterrows():
-        geo_json = gpd.GeoSeries([row.geometry]).__geo_interface__
-
-        folium.GeoJson(
-            data=geo_json,
-            style_function=lambda feature, color=colors[row["Cluster"]]: {
-                'fillColor': color,
-                'color': 'black',
-                'weight': 0.5,
-                'fillOpacity': 0.7,
-            },
-            tooltip=Tooltip(f"Desa: {row['Desa'].title()}<br>Kecamatan: {row['Kecamatan'].title()}<br>Cluster: {row['Cluster']}")
-        ).add_to(m)
-
-    # Tambahkan legend
-    legend_html = """
-    <style>
-    .legend {
-        position: absolute;
-        bottom: 50px;
-        left: 10px;
-        z-index: 9999;
-        background-color: white;
-        border: 2px solid gray;
-        padding: 10px;
-        font-size: 14px;
-        box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
-    }
-    .legend i {
-        width: 14px;
-        height: 14px;
-        float: left;
-        margin-right: 8px;
-        opacity: 0.7;
-    }
-    </style>
-
-    <div class='legend'>
-        <b>Legenda:</b><br>
-        <i style='background: #66c2a5'></i> Cluster 0<br>
-        <i style='background: #ffd92f'></i> Cluster 1<br>
-    </div>
-    """
-    
-    # Menampilkan peta
-    st_folium(m, width=1000, height=600)
-
-    # Menampilkan legend
-    st.markdown(legend_html, unsafe_allow_html=True)
+        st.info("Tekan tombol 'Tampilkan Peta' untuk melihat peta hasil clustering")
 
     # Download hasil
     csv = dfdesa.to_csv(index=False).encode("utf-8")

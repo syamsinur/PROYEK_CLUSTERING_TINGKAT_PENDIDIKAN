@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.metrics import silhouette_score, davies_bouldin_score
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 import scipy.cluster.hierarchy as sch
 import folium # type: ignore
 from folium import Tooltip # type: ignore
@@ -98,6 +98,7 @@ if uploaded_file:
     if metode == "K-Means":
         silhouette_scores = []
         dbi_scores = []
+        chi_scores = []
 
         for n_clusters in range(2, 11):
             kmeans = KMeans(n_clusters=n_clusters, random_state=42)
@@ -110,6 +111,10 @@ if uploaded_file:
             # Menghitung Davies-Bouldin Index
             dbi_avg_km = davies_bouldin_score(x_train_scaled, clusters_km)
             dbi_scores.append(dbi_avg_km)
+
+            # Menghitung Calinski-Harabasz Index
+            chi_avg_km = calinski_harabasz_score(x_train_scaled, clusters_km)
+            chi_scores.append(chi_avg_km)
 
         # Elbow Plot
         st.header("📈 Elbow Plot")
@@ -125,6 +130,9 @@ if uploaded_file:
         ax.set_ylabel("Inertia")
         ax.set_title("Elbow Method")
 
+        for i, value in enumerate(inertias):
+            plt.text(k_range[i], value + 0.5, f"{value:.2f}", ha='center')
+
         st.pyplot(fig)
         
         k = st.slider("Pilih jumlah cluster", 2, 10, 2)
@@ -135,6 +143,7 @@ if uploaded_file:
     elif metode == "Hierarchical Ward":
         silhouette_scores = []
         dbi_scores = []
+        chi_scores = []
 
         for n_clusters in range(2, 11):
             hie = AgglomerativeClustering(n_clusters=n_clusters, linkage="ward")
@@ -147,6 +156,10 @@ if uploaded_file:
             # Menghitung Davies-Bouldin Index
             dbi_avg_hie = davies_bouldin_score(x_train_scaled, clusters_hie)
             dbi_scores.append(dbi_avg_hie)
+
+            # Menghitung Calinski-Harabasz Index
+            chi_avg_hie = calinski_harabasz_score(x_train_scaled, clusters_hie)
+            chi_scores.append(chi_avg_hie)
 
         # Dendrogram
         st.header("🧬 Dendrogram")
@@ -162,8 +175,8 @@ if uploaded_file:
     # Evaluasi
     st.header("📊 Evaluasi")
 
-    # Silhouette dan Davies-Bouldin Index terbaik
-    col1, col2 =st.columns(2)
+    # Silhouette, DBI, dan CH
+    col1, col2, col3 =st.columns(3)
 
     with col1:
         sil = round(silhouette_score(x_train_scaled, cluster), 4)
@@ -173,10 +186,15 @@ if uploaded_file:
         dbi = round(davies_bouldin_score(x_train_scaled, cluster), 4)
         st.metric(label="Davies-Bouldin Index", value=dbi)
 
-    # Nilai silhouette dan Davies-Bouldin Index dari 2 cluster hingga 10 cluster
+    with col3:
+        ch = round(calinski_harabasz_score(x_train_scaled, cluster), 4)
+        st.metric(label="Calinski-Harabasz Index", value=ch)
+
+    # Nilai silhouette, DBI, dan CH dari 2 cluster hingga 10 cluster
     df_scores = pd.DataFrame({
         "Silhouette Score": silhouette_scores, 
-        "Davies-Bouldin Index": dbi_scores
+        "Davies-Bouldin Index": dbi_scores,
+        "Calinski-Harabasz Index": chi_scores
     }, index=range(2, 11))
 
     def highlight_max_min(s):
@@ -184,10 +202,12 @@ if uploaded_file:
             return ["background-color: #5DE2E7" if v == s.max() else '' for v in s]
         elif s.name == "Davies-Bouldin Index":
             return ["background-color: #FE9900" if v == s.min() else '' for v in s] 
+        elif s.name == "Calinski-Harabasz Index":
+            return ["background-color: #FE9900" if v == s.max() else '' for v in s]
         
     st.dataframe(df_scores.style.apply(highlight_max_min), column_config={"_index": "Jumlah Cluster"})
 
-    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
+    fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(18, 6))
 
     # Plot Silhouette Scores
     ax[0].plot(range(2, 11), silhouette_scores, marker='o', color='#5DE2E7', label='Silhouette Score')
@@ -204,6 +224,14 @@ if uploaded_file:
     ax[1].set_ylabel('Davies-Bouldin Index')
     ax[1].tick_params(axis='x', labelsize=12)
     ax[1].grid(True)
+
+    # Plot Calinski-Harabasz Index
+    ax[2].plot(range(2, 11), chi_scores, marker='o', color='#FE9900', label='Calinski-Harabasz Index')
+    ax[2].set_title('Calinski-Harabasz Index untuk Berbagai Jumlah Cluster', pad=10)
+    ax[2].set_xlabel('Jumlah Cluster')
+    ax[2].set_ylabel('Calinski-Harabasz Index')
+    ax[2].tick_params(axis='x', labelsize=12)
+    ax[2].grid(True)
 
     st.pyplot(fig)
 
@@ -282,8 +310,35 @@ if uploaded_file:
     st.header("📊 Hasil Clustering")
 
     # Warna untuk cluster
-    colors = ['#66c2a5', '#ffd92f']
-    labels = ['0', '1']
+    colors = []
+    labels = []
+    if k == 2:
+        colors = ["#66c2a5", "#ffd92f"]
+        labels = ["0", "1"]
+    elif k == 3:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d"]
+        labels = ["0", "1", "2"]
+    elif k == 4:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854"]
+        labels = ["0", "1", "2", "3"]
+    elif k == 5:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854", "#fc8d62"]
+        labels = ["0", "1", "2", "3", "4"]
+    elif k == 6:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854", "#fc8d62", "#8da0cb"]
+        labels = ["0", "1", "2", "3", "4", "5"]
+    elif k == 7:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854", "#fc8d62", "#8da0cb", "#e78ac3"]
+        labels = ["0", "1", "2", "3", "4", "5", "6"]
+    elif k == 8:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854", "#fc8d62", "#8da0cb", "#e78ac3", "#a6cee3"]
+        labels = ["0", "1", "2", "3", "4", "5", "6", "7"]
+    elif k == 9:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854", "#fc8d62", "#8da0cb", "#e78ac3", "#a6cee3", "#b2df8a"]
+        labels = ["0", "1", "2", "3", "4", "5", "6", "7", "8"]
+    elif k == 10:
+        colors = ["#66c2a5", "#ffd92f", "#ff3d3d", "#a6d854", "#fc8d62", "#8da0cb", "#e78ac3", "#a6cee3", "#b2df8a", "#fb9a99"]
+        labels = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
     clust = st.number_input("Pilih Cluster", value=0)
 
@@ -292,7 +347,7 @@ if uploaded_file:
         "Persentase (%)": (dfdesa['Cluster'].value_counts() / dfdesa['Cluster'].value_counts().sum() * 100).round(2).astype(str) + '%'
     })
     
-    if clust == 0 or clust == 1:
+    if clust in dfdesa['Cluster'].unique():
         df_filtered = dfdesa[dfdesa['Cluster'] == clust]
         st.dataframe(df_filtered)
         st.dataframe(df, column_config={"_index": "Cluster"})
@@ -378,34 +433,38 @@ if uploaded_file:
             ).add_to(m)
 
         # Tambahkan legend
-        legend_html = """
-        <style>
-        .legend {
-            position: absolute;
-            bottom: 50px;
-            left: 10px;
-            z-index: 9999;
-            background-color: white;
-            border: 2px solid gray;
-            padding: 10px;
-            font-size: 14px;
-            box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
-        }
-        .legend i {
-            width: 14px;
-            height: 14px;
-            float: left;
-            margin-right: 8px;
-            opacity: 0.7;
-        }
-        </style>
+        legend_items = ""
+        for i in range(k):
+            legend_items += f"<i style='background:{colors[i]}'></i> Cluster {i}<br>"
 
-        <div class='legend'>
-            <b>Legend:</b><br>
-            <i style='background: #66c2a5'></i> Cluster 0<br>
-            <i style='background: #ffd92f'></i> Cluster 1<br>
-        </div>
+        legend_html = f"""
+            <style>
+            .legend {{
+                position: absolute;
+                bottom: 50px;
+                left: 10px;
+                z-index: 9999;
+                background-color: white;
+                border: 2px solid gray;
+                padding: 10px;
+                font-size: 14px;
+                box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+            }}
+            .legend i {{
+                width: 14px;
+                height: 14px;
+                float: left;
+                margin-right: 8px;
+                opacity: 0.7;
+            }}
+            </style>
+
+            <div class='legend'>
+                <b>Legend:</b><br>
+                {legend_items}
+            </div>
         """
+
         
         # Menampilkan peta
         st_folium(m, width=1000, height=600)
